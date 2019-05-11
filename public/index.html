@@ -176,7 +176,18 @@
         </div>
       </div>
     </div>
+    <!-- trying offline form -->
+  <div>
+      <form id="offline-form">
+        <input type="text" id="phoneNumber" placeholder="phone" required>
+        <input type="text" id="body" placeholder="msg" required>
+        <input type="submit" placeholder="Submit">
+  
+      </form>
+    </div>
   </main>
+
+  
 
   <div id="addDialogContainer">
     <div class="dialog">
@@ -206,6 +217,8 @@
   </div>
 
   <script src="/scripts/luxon-1.11.4.js"></script>
+  <script src="/scripts/idb.js"></script>
+  <script src="/scripts/store.js"></script>
   <script src="/scripts/app.js"></script>
   <!-- CODELAB: Add the install script here -->
   <script src="/scripts/install.js"></script>
@@ -216,6 +229,37 @@
         navigator.serviceWorker.register('/service-worker.js')
             .then((reg) => {
               console.log('Service worker registered.', reg);
+              if('sync' in reg)
+              {
+                //intercept submit form submit event
+                var form = document.querySelector('#offline-form');
+                var phoneNumberField = form.querySelector('#phoneNumber');
+                var bodyField = form.querySelector('#body');
+                form.addEventListener('submit', function(event) {
+                event.preventDefault();
+                var message = {
+                  phoneNumber: phoneNumberField.value,
+                  body: bodyField.value
+                };
+
+               store.outbox('readwrite').then(function(outbox) {
+                 return outbox.put(message);
+                }).then(function() {
+                  // register for sync and clean up the form
+                  bodyField.value = '';
+                    if (phoneNumberField.getAttribute('type') !== 'hidden') {
+                      phoneNumberField.value = '';
+                    }
+                    return reg.sync.register('outbox');
+                  }).catch(function(err) {
+                    // something went wrong with the database or the sync registration, log and submit the form
+                    console.error(err); 
+                    form.submit();
+                  
+                });
+
+              }
+              )};
             });
       });
     }

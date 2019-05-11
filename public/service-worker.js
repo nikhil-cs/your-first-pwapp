@@ -17,6 +17,11 @@
  */
 'use strict';
 
+//import idb library
+importScripts('/scripts/idb.js');
+importScripts('/scripts/store.js');
+
+
 // CODELAB: Update cache names any time any of the cached files change.
 const CACHE_NAME = 'static-cache-v3';
 const DATA_CACHE_NAME = 'data-cache-v1';
@@ -107,5 +112,40 @@ self.addEventListener('fetch', (evt) => {
       })
   );
 
+});
+
+
+
+
+self.addEventListener('sync', function(event) {
+  event.waitUntil(
+    store.outbox('readonly').then(function(outbox) {
+      return outbox.getAll();
+    }).then(function(messages) { 
+      // send the messages
+      return Promise.all(messages.map(function(message) {
+        return fetch('/messages', {
+          method: 'POST',
+          body: JSON.stringify(message),
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+          }
+        }).then(function(response) {  
+          return response.json();
+        }).then(function(data) {
+          if (data.result === 'success') {
+            //console.log("time" + new Date());
+            return store.outbox('readwrite').then(function(outbox) {
+              return outbox.delete(message.id);
+            });
+          }
+        });
+      
+    }).catch(function(err) { console.error(err); })
+  );
+})
+);
 });
 
